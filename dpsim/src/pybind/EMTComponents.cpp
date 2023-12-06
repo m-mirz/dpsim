@@ -170,14 +170,22 @@ void addEMTPh3Components(py::module_ mEMTPh3) {
       .def("connect", &CPS::EMT::Ph3::NetworkInjection::connect);
 
   py::class_<CPS::EMT::Ph3::PiLine, std::shared_ptr<CPS::EMT::Ph3::PiLine>,
-             CPS::SimPowerComp<CPS::Real>>(mEMTPh3, "PiLine",
-                                           py::multiple_inheritance())
+             CPS::SimPowerComp<CPS::Real>, CPS::Base::Ph3::PiLine>(
+      mEMTPh3, "PiLine", py::multiple_inheritance())
       .def(py::init<std::string, CPS::Logger::Level>(), "name"_a,
            "loglevel"_a = CPS::Logger::Level::off)
-      .def("set_parameters", &CPS::EMT::Ph3::PiLine::setParameters,
+      .def("set_parameters1",
+           py::overload_cast<CPS::Real, CPS::Real, CPS::Real, CPS::Real>(
+               &CPS::EMT::Ph3::PiLine::setParameters),
            "series_resistance"_a, "series_inductance"_a,
-           "parallel_capacitance"_a = zeroMatrix(3),
-           "parallel_conductance"_a = zeroMatrix(3))
+           "parallel_capacitance"_a = 0.0, "parallel_conductance"_a = 0.0)
+      .def(
+          "set_parameters",
+          py::overload_cast<CPS::Matrix, CPS::Matrix, CPS::Matrix, CPS::Matrix>(
+              &CPS::EMT::Ph3::PiLine::setParameters),
+          "series_resistance"_a, "series_inductance"_a,
+          "parallel_capacitance"_a = zeroMatrix(3),
+          "parallel_conductance"_a = zeroMatrix(3))
       .def("connect", &CPS::EMT::Ph3::PiLine::connect);
 
   py::class_<CPS::EMT::Ph3::RXLoad, std::shared_ptr<CPS::EMT::Ph3::RXLoad>,
