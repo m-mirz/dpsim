@@ -11,8 +11,8 @@
 using namespace CPS;
 
 EMT::Ph3::PiLine::PiLine(String uid, String name, Logger::Level logLevel)
-    : Base::Ph3::PiLine(mAttributes), CompositePowerComp<Real>(uid, name, true,
-                                                               true, logLevel) {
+    : Base::Ph3::PiLine(mAttributes),
+      CompositePowerComp<Real>(uid, name, true, true, logLevel) {
   mPhaseType = PhaseType::ABC;
   setTerminalNumber(2);
 
@@ -21,14 +21,6 @@ EMT::Ph3::PiLine::PiLine(String uid, String name, Logger::Level logLevel)
   **mIntfCurrent = Matrix::Zero(3, 1);
 
   mSLog->flush();
-}
-
-/// DEPRECATED: Delete method
-SimPowerComp<Real>::Ptr EMT::Ph3::PiLine::clone(String name) {
-  auto copy = PiLine::make(name, mLogLevel);
-  copy->setParameters(**mSeriesRes, **mSeriesInd, **mParallelCap,
-                      **mParallelCond);
-  return copy;
 }
 
 void EMT::Ph3::PiLine::initializeFromNodesAndTerminals(Real frequency) {
