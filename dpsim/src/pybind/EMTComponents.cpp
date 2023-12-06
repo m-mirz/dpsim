@@ -170,11 +170,11 @@ void addEMTPh3Components(py::module_ mEMTPh3) {
       .def("connect", &CPS::EMT::Ph3::NetworkInjection::connect);
 
   py::class_<CPS::EMT::Ph3::PiLine, std::shared_ptr<CPS::EMT::Ph3::PiLine>,
-             CPS::SimPowerComp<CPS::Real>, CPS::Base::Ph3::PiLine>(
-      mEMTPh3, "PiLine", py::multiple_inheritance())
+             CPS::SimPowerComp<CPS::Real>>(mEMTPh3, "PiLine",
+                                           py::multiple_inheritance())
       .def(py::init<std::string, CPS::Logger::Level>(), "name"_a,
            "loglevel"_a = CPS::Logger::Level::off)
-      .def("set_parameters1",
+      .def("set_symmetric_parameters",
            py::overload_cast<CPS::Real, CPS::Real, CPS::Real, CPS::Real>(
                &CPS::EMT::Ph3::PiLine::setParameters),
            "series_resistance"_a, "series_inductance"_a,
@@ -195,6 +195,10 @@ void addEMTPh3Components(py::module_ mEMTPh3) {
            "loglevel"_a = CPS::Logger::Level::off)
       .def("set_power",
            py::overload_cast<CPS::Matrix, CPS::Matrix>(
+               &CPS::EMT::Ph3::RXLoad::setParameters),
+           "active_power"_a, "reactive_power"_a)
+      .def("set_power",
+           py::overload_cast<CPS::Real, CPS::Real>(
                &CPS::EMT::Ph3::RXLoad::setParameters),
            "active_power"_a, "reactive_power"_a)
       .def("set_parameters",

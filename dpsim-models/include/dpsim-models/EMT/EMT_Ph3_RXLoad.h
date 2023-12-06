@@ -59,6 +59,8 @@ public:
          Real nominalVoltage, Logger::Level logLevel = Logger::Level::off);
 
   // #### General ####
+  /// set 1ph power (power_phase_a = power_phase_b = power_phase_a = power_1ph/3)
+  void setParameters(Real activePower, Real reactivePower);
   ///
   void setParameters(Matrix activePower, Matrix reactivePower);
   ///
