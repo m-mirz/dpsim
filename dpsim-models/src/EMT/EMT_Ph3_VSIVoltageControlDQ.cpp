@@ -41,7 +41,7 @@ EMT::Ph3::VSIVoltageControlDQ::VSIVoltageControlDQ(String uid, String name,
   if (withTrafo) {
     setVirtualNodeNumber(4);
     mConnectionTransformer = EMT::Ph3::Transformer::make(
-        **mName + "_trans", **mName + "_trans", mLogLevel, false);
+        **mName + "_trans", **mName + "_trans", mLogLevel);
     addMNASubComponent(mConnectionTransformer,
                        MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT,
                        MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT, true);
@@ -139,22 +139,11 @@ void EMT::Ph3::VSIVoltageControlDQ::setTransformerParameters(
       nomVoltageEnd1, nomVoltageEnd2, ratedPower, ratioAbs, ratioPhase,
       resistance, inductance);
 
-  SPDLOG_LOGGER_INFO(mSLog, "Connection Transformer Parameters:");
-  SPDLOG_LOGGER_INFO(
-      mSLog, "Nominal Voltage End 1={} [V] Nominal Voltage End 2={} [V]",
-      mTransformerNominalVoltageEnd1, mTransformerNominalVoltageEnd2);
-  SPDLOG_LOGGER_INFO(mSLog, "Rated Apparent Power = {} [VA]",
-                     mTransformerRatedPower);
-  SPDLOG_LOGGER_INFO(mSLog, "Resistance={} [Ohm] Inductance={} [H]",
-                     mTransformerResistance, mTransformerInductance);
-  SPDLOG_LOGGER_INFO(mSLog, "Tap Ratio={} [ ] Phase Shift={} [deg]",
-                     mTransformerRatioAbs, mTransformerRatioPhase);
-
   if (mWithConnectionTransformer)
     // TODO: resistive losses neglected so far (mWithResistiveLosses=false)
     mConnectionTransformer->setParameters(
         mTransformerNominalVoltageEnd1, mTransformerNominalVoltageEnd2,
-        mTransformerRatedPower, mTransformerRatioAbs, mTransformerRatioPhase,
+        mTransformerRatioAbs, mTransformerRatioPhase,
         CPS::Math::singlePhaseParameterToThreePhase(mTransformerResistance),
         CPS::Math::singlePhaseParameterToThreePhase(mTransformerInductance));
 }
@@ -222,9 +211,8 @@ void EMT::Ph3::VSIVoltageControlDQ::initializeFromNodesAndTerminals(
   MatrixComp intfVoltageComplex = Matrix::Zero(3, 1);
   MatrixComp intfCurrentComplex = Matrix::Zero(3, 1);
   // terminal powers in consumer system -> convert to generator system
-  Real activePower = terminal(0)->singlePower().real();
-  ;
-  Real reactivePower = terminal(0)->singlePower().imag();
+  Real activePower = -terminal(0)->singlePower().real();
+  Real reactivePower = -terminal(0)->singlePower().imag();
 
   // derive complex threephase initialization from single phase initial values (only valid for balanced systems)
   intfVoltageComplex(0, 0) = RMS3PH_TO_PEAK1PH * initialSingleVoltage(0);

@@ -120,9 +120,11 @@ int main(int argc, char *argv[]) {
   lineDP->connect({n1DP, n2DP});
   loadDP->connect({n2DP});
 
-  auto systemDP =
-      SystemTopology(scenario.systemNominalFreq, SystemNodeList{n1DP, n2DP},
-                     SystemComponentList{loadDP, lineDP, pv});
+  // Initialization of dynamic topology
+  systemDP.initWithPowerflow(systemPF, CPS::Domain::DP);
+  Complex initial1PhPowerVSI =
+      Complex(linePF->attributeTyped<Real>("p_inj")->get(),
+              linePF->attributeTyped<Real>("q_inj")->get());
 
   // Initialization of dynamic topology
   systemDP.initWithPowerflow(systemPF, Domain::DP);
