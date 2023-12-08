@@ -146,3 +146,5 @@
 #include <dpsim-models/Signal/TurbineGovernorType1.h>
 #include <dpsim-models/Signal/VCO.h>
 #include <dpsim-models/Signal/VoltageControllerVSI.h>
+#include <dpsim-models/Signal/VSIControlType1.h>
+#include <dpsim-models/Signal/VSIControlType2.h>
