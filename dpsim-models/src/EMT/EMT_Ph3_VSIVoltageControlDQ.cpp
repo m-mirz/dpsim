@@ -12,60 +12,87 @@ using namespace CPS;
 
 EMT::Ph3::VSIVoltageControlDQ::VSIVoltageControlDQ(String uid, String name,
                                                    Logger::Level logLevel,
+                                                   Bool withInterfaceResistor,
                                                    Bool withTrafo)
     : CompositePowerComp<Real>(uid, name, true, true, logLevel),
-      VSIVoltageSourceInverterDQ(this->mSLog, mAttributes, withTrafo) {
+      VSIVoltageSourceInverterDQ(this->mSLog, mAttributes,
+                                 withInterfaceResistor, withTrafo) {
 
   mPhaseType = PhaseType::ABC;
 
   setTerminalNumber(1);
-  if (mWithConnectionTransformer)
+  if (mWithConnectionTransformer && mWithInterfaceResistor)
     setVirtualNodeNumber(3);
-  else
+  else if (mWithConnectionTransformer || mWithInterfaceResistor)
     setVirtualNodeNumber(2);
+  else
+    setVirtualNodeNumber(1);
 }
 
 void EMT::Ph3::VSIVoltageControlDQ::createSubComponents() {
-  // create electrical subcomponents
+  // voltage source
+  // TODO: REMOVE VOLTAGE SOURCE FOR MORE SPEED
   mSubCtrledVoltageSource =
       EMT::Ph3::VoltageSource::make(**mName + "_src", mLogLevel);
-  mSubFilterRL = EMT::Ph3::ResIndSeries::make(**mName + "_FilterRL", mLogLevel);
-  mSubCapacitorF = EMT::Ph3::Capacitor::make(**mName + "_CapF", mLogLevel);
-  // TODO: ADD IF FOR INTERFACE RESISTOR?
-  mSubResistorC = EMT::Ph3::Resistor::make(**mName + "_ResC", mLogLevel);
   addMNASubComponent(mSubCtrledVoltageSource, MNA_SUBCOMP_TASK_ORDER::NO_TASK,
                      MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT, true);
+
+  // RL Element as part of the LC filter
+  mSubFilterRL = EMT::Ph3::ResIndSeries::make(**mName + "_FilterRL", mLogLevel);
   addMNASubComponent(mSubFilterRL, MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT,
                      MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT, true);
+  mSubFilterRL->setParameters(Math::singlePhaseParameterToThreePhase(mRf),
+                              Math::singlePhaseParameterToThreePhase(mLf));
+
+  // Capacitor as part of the LC filter
+  mSubCapacitorF = EMT::Ph3::Capacitor::make(**mName + "_CapF", mLogLevel);
   addMNASubComponent(mSubCapacitorF, MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT,
                      MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT, true);
-  addMNASubComponent(mSubResistorC, MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT,
-                     MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT, true);
+  mSubCapacitorF->setParameters(Math::singlePhaseParameterToThreePhase(mCf));
+
+  // optinal: interface resistor
+  if (mWithInterfaceResistor) {
+    mSubResistorC = EMT::Ph3::Resistor::make(**mName + "_ResC", mLogLevel);
+    addMNASubComponent(mSubResistorC,
+                       MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT,
+                       MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT, true);
+    mSubResistorC->setParameters(Math::singlePhaseParameterToThreePhase(mRc));
+  }
+
+  // optional: with power transformer
   if (mWithConnectionTransformer) {
     mConnectionTransformer = EMT::Ph3::Transformer::make(
         **mName + "_trans", **mName + "_trans", mLogLevel);
+    //TODO: SET PARAMETERS
     addMNASubComponent(mConnectionTransformer,
                        MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT,
                        MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT, true);
   }
-
-  // set parameters of electrical subcomponents
-  mSubFilterRL->setParameters(Math::singlePhaseParameterToThreePhase(mRf),
-                              Math::singlePhaseParameterToThreePhase(mLf));
-  mSubCapacitorF->setParameters(Math::singlePhaseParameterToThreePhase(mCf));
-  mSubResistorC->setParameters(Math::singlePhaseParameterToThreePhase(mRc));
 }
 
 void EMT::Ph3::VSIVoltageControlDQ::connectSubComponents() {
+  // TODO: COULD WE MOVE THIS FUNCTION TO THE BASE CLASS?
   mSubCtrledVoltageSource->connect({SimNode::GND, mVirtualNodes[0]});
-  mSubFilterRL->connect({mVirtualNodes[1], mVirtualNodes[0]});
-  mSubCapacitorF->connect({SimNode::GND, mVirtualNodes[1]});
-  if (mWithConnectionTransformer) {
-    // TODO: COULD WE REMOVE THE TRANSFORMER?
+  if (mWithConnectionTransformer && mWithInterfaceResistor) {
+    // with transformer and interface resistor
+    mSubFilterRL->connect({mVirtualNodes[1], mVirtualNodes[0]});
+    mSubCapacitorF->connect({SimNode::GND, mVirtualNodes[1]});
     mSubResistorC->connect({mVirtualNodes[2], mVirtualNodes[1]});
     mConnectionTransformer->connect({mTerminals[0]->node(), mVirtualNodes[2]});
-  } else {
+  } else if (mWithConnectionTransformer) {
+    // only transformer
+    mSubFilterRL->connect({mVirtualNodes[1], mVirtualNodes[0]});
+    mSubCapacitorF->connect({SimNode::GND, mVirtualNodes[1]});
+    mConnectionTransformer->connect({mTerminals[0]->node(), mVirtualNodes[1]});
+  } else if (mWithInterfaceResistor) {
+    // only interface resistor
+    mSubFilterRL->connect({mVirtualNodes[1], mVirtualNodes[0]});
+    mSubCapacitorF->connect({SimNode::GND, mVirtualNodes[1]});
     mSubResistorC->connect({mTerminals[0]->node(), mVirtualNodes[1]});
+  } else {
+    // without transformer and interface resistor
+    mSubFilterRL->connect({mTerminals[0]->node(), mVirtualNodes[0]});
+    mSubCapacitorF->connect({SimNode::GND, mTerminals[0]->node()});
   }
 }
 
@@ -98,7 +125,11 @@ void EMT::Ph3::VSIVoltageControlDQ::initializeFromNodesAndTerminals(
 
   // derive initialization quantities of filter
   /// initial filter capacitor voltage
-  Complex vcInit = intfVoltageComplex + intfCurrentComplex * mRc;
+  Complex vcInit;
+  if (mWithInterfaceResistor)
+    vcInit = intfVoltageComplex + intfCurrentComplex * mRc;
+  else
+    vcInit = (**mIntfVoltage)(0, 0);
   /// initial filter capacitor current
   Complex icfInit = vcInit * Complex(0., mOmegaNom * mCf);
   /// initial voltage of voltage source
@@ -107,11 +138,19 @@ void EMT::Ph3::VSIVoltageControlDQ::initializeFromNodesAndTerminals(
 
   // initialize voltage of virtual nodes
   mVirtualNodes[0]->setInitialVoltage(vsInit);
-  mVirtualNodes[1]->setInitialVoltage(vcInit);
-  if (mWithConnectionTransformer)
+  if (mWithConnectionTransformer && mWithInterfaceResistor) {
+    // filter capacitor is connected to mVirtualNodes[1]
+    // and interface resistor between mVirtualNodes[1] and mVirtualNodes[2]
+    mVirtualNodes[1]->setInitialVoltage(vcInit);
+    // TODO: CHECK CALCULATION OF intfVoltageComplex
     mVirtualNodes[2]->setInitialVoltage(intfVoltageComplex);
+  } else if (mWithConnectionTransformer || mWithInterfaceResistor) {
+    // filter capacitor is connected to mVirtualNodes[1], the second
+    // node of the PT or of the interface resistor is mTerminals[0]
+    mVirtualNodes[1]->setInitialVoltage(vcInit);
+  }
 
-  // Set parameters electrical subcomponents
+  // initial reference voltage of voltage source
   **mVsref = Math::singlePhaseVariableToThreePhase(vsInit).real();
 
   // Create & Initialize electrical subcomponents
@@ -129,10 +168,16 @@ void EMT::Ph3::VSIVoltageControlDQ::initializeFromNodesAndTerminals(
   **mThetaInv = std::arg(vcInit);
 
   // Initialie voltage controller variables
-  **mVcap_dq = Math::rotatingFrame2to1(vcInit, **mThetaInv, **mThetaSys);
-  **mIfilter_dq = Math::rotatingFrame2to1(intfCurrentComplex + icfInit,
-                                          **mThetaInv, **mThetaSys);
-  **mVsref_dq = Math::rotatingFrame2to1(vsInit, **mThetaInv, **mThetaSys);
+  **mVcap_dq =
+      parkTransformPowerInvariant(**mThetaInv, **mSubCapacitorF->mIntfVoltage);
+  if (mWithInterfaceResistor)
+    // TODO: CHECK
+    **mIfilter_dq =
+        parkTransformPowerInvariant(**mThetaInv, **mSubResistorC->mIntfCurrent);
+  else
+    **mIfilter_dq =
+        parkTransformPowerInvariant(**mThetaInv, **mSubFilterRL->mIntfCurrent);
+  **mVsref_dq = parkTransformPowerInvariant(**mThetaInv, (**mVsref).real());
 
   SPDLOG_LOGGER_INFO(
       mSLog,
@@ -174,9 +219,13 @@ void EMT::Ph3::VSIVoltageControlDQ::mnaParentPreStep(Real time,
   // Transformation interface forward
   **mVcap_dq =
       parkTransformPowerInvariant(**mThetaInv, **mSubCapacitorF->mIntfVoltage);
-  //**mIfilter_dq = Math::rotatingFrame2to1((**mSubFilterRL->mIntfCurrent)(0, 0), **mThetaInv, **mThetaSys);
-  **mIfilter_dq =
-      parkTransformPowerInvariant(**mThetaInv, **mSubFilterRL->mIntfCurrent);
+  if (mWithInterfaceResistor)
+    // TODO: CHECK
+    **mIfilter_dq =
+        parkTransformPowerInvariant(**mThetaInv, **mSubResistorC->mIntfCurrent);
+  else
+    **mIfilter_dq =
+        parkTransformPowerInvariant(**mThetaInv, **mSubFilterRL->mIntfCurrent);
 
   // TODO: droop
   //if (mWithDroop)
@@ -196,14 +245,15 @@ void EMT::Ph3::VSIVoltageControlDQ::mnaParentPreStep(Real time,
   **mVsref = inverseParkTransformPowerInvariant(**mThetaInv, **mVsref_dq) *
              sqrt(3 / 2);
 
-  // pre-step of subcomponents - controlled source
+  // set reference voltage of voltage source
   if (mWithControl)
     **mSubCtrledVoltageSource->mVoltageRef = **mVsref * PEAK1PH_TO_RMS3PH;
 
+  // pre-step of voltage source
   std::dynamic_pointer_cast<MNAInterface>(mSubCtrledVoltageSource)
       ->mnaPreStep(time, timeStepCount);
 
-  // pre-step of component itself
+  // stamp right side vector
   mnaApplyRightSideVectorStamp(**mRightVector);
 }
 
@@ -227,14 +277,19 @@ void EMT::Ph3::VSIVoltageControlDQ::mnaCompUpdateCurrent(
     const Matrix &leftvector) {
   if (mWithConnectionTransformer)
     **mIntfCurrent = mConnectionTransformer->mIntfCurrent->get();
-  else
+  else if (mWithInterfaceResistor)
     **mIntfCurrent = mSubResistorC->mIntfCurrent->get();
+  else
+    **mIntfCurrent =
+        mSubCapacitorF->mIntfCurrent->get() + mSubFilterRL->mIntfCurrent->get();
 }
 
 void EMT::Ph3::VSIVoltageControlDQ::mnaCompUpdateVoltage(
     const Matrix &leftVector) {
   for (auto virtualNode : mVirtualNodes)
+    // CHECK: Is it really necessary?
     virtualNode->mnaUpdateVoltage(leftVector);
+
   (**mIntfVoltage)(0, 0) =
       Math::realFromVectorElement(leftVector, matrixNodeIndex(0, 0));
   (**mIntfVoltage)(1, 0) =
@@ -243,7 +298,14 @@ void EMT::Ph3::VSIVoltageControlDQ::mnaCompUpdateVoltage(
       Math::realFromVectorElement(leftVector, matrixNodeIndex(0, 2));
 
   // Update Power
-  //**mPower = (**mIntfVoltage)(0,0) * std::conj((**mIntfCurrent)(0,0));
+  Complex intfVoltageDQ =
+      parkTransformPowerInvariant(**mThetaInv, **mIntfVoltage);
+  Complex intfCurrentDQ =
+      parkTransformPowerInvariant(**mThetaInv, **mIntfCurrent);
+  **mPower = -Complex(intfVoltageDQ.real() * intfCurrentDQ.real() +
+                          intfVoltageDQ.imag() * intfCurrentDQ.imag(),
+                      intfVoltageDQ.imag() * intfCurrentDQ.real() -
+                          intfVoltageDQ.real() * intfCurrentDQ.imag());
 }
 
 Complex

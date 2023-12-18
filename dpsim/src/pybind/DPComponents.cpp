@@ -378,8 +378,10 @@ void addDPPh1Components(py::module_ mDPPh1) {
       mDPPh1, "VSIVoltageControlDQ", py::multiple_inheritance())
       .def(py::init<std::string, CPS::Logger::Level>(), "name"_a,
            "loglevel"_a = CPS::Logger::Level::off)
-      .def(py::init<std::string, std::string, CPS::Logger::Level, CPS::Bool>(),
+      .def(py::init<std::string, std::string, CPS::Logger::Level, CPS::Bool,
+                    CPS::Bool>(),
            "uid"_a, "name"_a, "loglevel"_a = CPS::Logger::Level::off,
+           "with_interface_resistor"_a = false,
            "with_trafo"_a = false) // cppcheck-suppress assignBoolToPointer
       .def("connect", &CPS::DP::Ph1::VSIVoltageControlDQ::connect);
 
