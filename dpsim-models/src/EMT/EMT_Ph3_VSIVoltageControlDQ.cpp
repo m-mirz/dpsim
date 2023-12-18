@@ -23,14 +23,9 @@ EMT::Ph3::VSIVoltageControlDQ::VSIVoltageControlDQ(String uid, String name,
     setVirtualNodeNumber(3);
   else
     setVirtualNodeNumber(2);
-
-  **mIntfVoltage = Matrix::Zero(3, 1);
-  **mIntfCurrent = Matrix::Zero(3, 1);
 }
 
 void EMT::Ph3::VSIVoltageControlDQ::createSubComponents() {
-  this->updateMatrixNodeIndices();
-
   // create electrical subcomponents
   mSubCtrledVoltageSource =
       EMT::Ph3::VoltageSource::make(**mName + "_src", mLogLevel);
@@ -59,8 +54,9 @@ void EMT::Ph3::VSIVoltageControlDQ::createSubComponents() {
                               Math::singlePhaseParameterToThreePhase(mLf));
   mSubCapacitorF->setParameters(Math::singlePhaseParameterToThreePhase(mCf));
   mSubResistorC->setParameters(Math::singlePhaseParameterToThreePhase(mRc));
+}
 
-  // Connect sub componetes
+void EMT::Ph3::VSIVoltageControlDQ::connectSubComponents() {
   mSubCtrledVoltageSource->connect({SimNode::GND, mVirtualNodes[0]});
   mSubFilterRL->connect({mVirtualNodes[1], mVirtualNodes[0]});
   mSubCapacitorF->connect({SimNode::GND, mVirtualNodes[1]});
@@ -109,17 +105,6 @@ void EMT::Ph3::VSIVoltageControlDQ::initializeFromNodesAndTerminals(
   Complex vsInit =
       vcInit + (intfCurrentComplex + icfInit) * Complex(mRf, mOmegaNom * mLf);
 
-  SPDLOG_LOGGER_INFO(mSLog,
-                     "\n--- Part Initialization from powerflow ---"
-                     "\nvcInit  = {}"
-                     "\nicfInit = {}"
-                     "\nvsInit  = {}"
-                     "\nInit If  = {}"
-                     "\nInit Vfilter  = {}",
-                     vcInit, icfInit, vsInit, intfCurrentComplex + icfInit,
-                     vsInit - vcInit);
-  mSLog->flush();
-
   // initialize voltage of virtual nodes
   mVirtualNodes[0]->setInitialVoltage(vsInit);
   mVirtualNodes[1]->setInitialVoltage(vcInit);
@@ -130,7 +115,7 @@ void EMT::Ph3::VSIVoltageControlDQ::initializeFromNodesAndTerminals(
   **mVsref = Math::singlePhaseVariableToThreePhase(vsInit).real();
 
   // Create & Initialize electrical subcomponents
-  this->createSubComponents();
+  this->connectSubComponents();
   for (auto subcomp : mSubComponents) {
     subcomp->initialize(mFrequencies);
     subcomp->initializeFromNodesAndTerminals(frequency);
@@ -148,14 +133,6 @@ void EMT::Ph3::VSIVoltageControlDQ::initializeFromNodesAndTerminals(
   **mIfilter_dq = Math::rotatingFrame2to1(intfCurrentComplex + icfInit,
                                           **mThetaInv, **mThetaSys);
   **mVsref_dq = Math::rotatingFrame2to1(vsInit, **mThetaInv, **mThetaSys);
-
-  SPDLOG_LOGGER_INFO(mSLog,
-                     "\n--- Part Initialization 2 from powerflow ---"
-                     "\n**mVcap_dq  = {}"
-                     "\n**mIfilter_dq = {}"
-                     "\n**mVsref_dq  = {}",
-                     **mVcap_dq, **mIfilter_dq, **mVsref_dq);
-  mSLog->flush();
 
   SPDLOG_LOGGER_INFO(
       mSLog,
