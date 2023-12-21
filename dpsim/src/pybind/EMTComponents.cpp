@@ -193,14 +193,18 @@ void addEMTPh3Components(py::module_ mEMTPh3) {
                                            py::multiple_inheritance())
       .def(py::init<std::string, CPS::Logger::Level>(), "name"_a,
            "loglevel"_a = CPS::Logger::Level::off)
-      .def("set_power",
-           py::overload_cast<CPS::Matrix, CPS::Matrix>(
-               &CPS::EMT::Ph3::RXLoad::setParameters),
-           "active_power"_a, "reactive_power"_a)
-      .def("set_power",
+      .def("set_parameters",
            py::overload_cast<CPS::Real, CPS::Real>(
                &CPS::EMT::Ph3::RXLoad::setParameters),
            "active_power"_a, "reactive_power"_a)
+      .def("set_parameters",
+           py::overload_cast<CPS::Matrix, CPS::Matrix>(
+               &CPS::EMT::Ph3::RXLoad::setParameters),
+           "active_power"_a, "reactive_power"_a)
+      .def("set_parameters",
+           py::overload_cast<CPS::Real, CPS::Real, CPS::Real>(
+               &CPS::EMT::Ph3::RXLoad::setParameters),
+           "active_power"_a, "reactive_power"_a, "volt"_a)
       .def("set_parameters",
            py::overload_cast<CPS::Matrix, CPS::Matrix, CPS::Real>(
                &CPS::EMT::Ph3::RXLoad::setParameters),

@@ -131,7 +131,7 @@ void addSPPh1Components(py::module_ mSPPh1) {
                                               py::multiple_inheritance())
       .def(py::init<std::string, CPS::Logger::Level>(), "name"_a,
            "loglevel"_a = CPS::Logger::Level::off)
-      .def("set_power",
+      .def("set_parameters",
            py::overload_cast<CPS::Real, CPS::Real>(
                &CPS::SP::Ph1::Load::setParameters),
            "active_power"_a, "reactive_power"_a)
