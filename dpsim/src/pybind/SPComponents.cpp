@@ -371,11 +371,11 @@ void addSPPh1Components(py::module_ mSPPh1) {
       .def(py::init<std::string, CPS::Logger::Level>(), "name"_a,
            "loglevel"_a = CPS::Logger::Level::off)
       .def(py::init<std::string, std::string, CPS::Logger::Level, CPS::Bool,
-                    CPS::Bool, CPS::Bool>(),
+                    CPS::Bool>(),
            "uid"_a, "name"_a, "loglevel"_a = CPS::Logger::Level::off,
            "models_as_current_source"_a = true,
-           "with_interface_resistor"_a = false,
-           "with_trafo"_a = false) // cppcheck-suppress assignBoolToPointer
+           "with_interface_resistor"_a =
+               false) // cppcheck-suppress assignBoolToPointer
       .def("connect", &CPS::SP::Ph1::VSIVoltageControlDQ::connect);
 }
 

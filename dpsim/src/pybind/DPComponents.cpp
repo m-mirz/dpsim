@@ -379,11 +379,11 @@ void addDPPh1Components(py::module_ mDPPh1) {
       .def(py::init<std::string, CPS::Logger::Level>(), "name"_a,
            "loglevel"_a = CPS::Logger::Level::off)
       .def(py::init<std::string, std::string, CPS::Logger::Level, CPS::Bool,
-                    CPS::Bool, CPS::Bool>(),
+                    CPS::Bool>(),
            "uid"_a, "name"_a, "loglevel"_a = CPS::Logger::Level::off,
            "models_as_current_source"_a = false,
-           "with_interface_resistor"_a = false,
-           "with_trafo"_a = false) // cppcheck-suppress assignBoolToPointer
+           "with_interface_resistor"_a =
+               false) // cppcheck-suppress assignBoolToPointer
       .def("connect", &CPS::DP::Ph1::VSIVoltageControlDQ::connect);
 
   py::class_<CPS::DP::Ph1::Inverter, std::shared_ptr<CPS::DP::Ph1::Inverter>,
