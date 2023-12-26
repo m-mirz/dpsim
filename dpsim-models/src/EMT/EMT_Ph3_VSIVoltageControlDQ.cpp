@@ -12,53 +12,27 @@ using namespace CPS;
 
 EMT::Ph3::VSIVoltageControlDQ::VSIVoltageControlDQ(String uid, String name,
                                                    Logger::Level logLevel,
+                                                   Bool modelAsCurrentSource,
                                                    Bool withInterfaceResistor,
                                                    Bool withTrafo)
     : CompositePowerComp<Real>(uid, name, true, true, logLevel),
-      VSIVoltageSourceInverterDQ(this->mSLog, mAttributes,
+      VSIVoltageSourceInverterDQ(this->mSLog, mAttributes, modelAsCurrentSource,
                                  withInterfaceResistor, withTrafo) {
 
   mPhaseType = PhaseType::ABC;
-
   setTerminalNumber(1);
-  if (mWithConnectionTransformer && mWithInterfaceResistor)
-    setVirtualNodeNumber(3);
-  else if (mWithConnectionTransformer || mWithInterfaceResistor)
-    setVirtualNodeNumber(2);
-  else
-    setVirtualNodeNumber(1);
+  setVirtualNodeNumber(this->determineNumberOfVirtualNodes());
 }
 
 void EMT::Ph3::VSIVoltageControlDQ::createSubComponents() {
   // voltage source
-  // TODO: REMOVE VOLTAGE SOURCE FOR MORE SPEED
-  mSubCtrledVoltageSource =
-      EMT::Ph3::VoltageSource::make(**mName + "_src", mLogLevel);
-  // Complex(1,0) is used as Vref but it is updated later in the initializationFromPF
-  addMNASubComponent(mSubCtrledVoltageSource, MNA_SUBCOMP_TASK_ORDER::NO_TASK,
-                     MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT, true);
-  mSubCtrledVoltageSource->setParameters(**mVsref, 0.0);
-
-  // RL Element as part of the LC filter
-  mSubFilterRL = EMT::Ph3::ResIndSeries::make(**mName + "_FilterRL", mLogLevel);
-  addMNASubComponent(mSubFilterRL, MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT,
-                     MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT, true);
-  mSubFilterRL->setParameters(Math::singlePhaseParameterToThreePhase(mRf),
-                              Math::singlePhaseParameterToThreePhase(mLf));
-
-  // Capacitor as part of the LC filter
-  mSubCapacitorF = EMT::Ph3::Capacitor::make(**mName + "_CapF", mLogLevel);
-  addMNASubComponent(mSubCapacitorF, MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT,
-                     MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT, true);
-  mSubCapacitorF->setParameters(Math::singlePhaseParameterToThreePhase(mCf));
-
-  // optinal: interface resistor
-  if (mWithInterfaceResistor) {
-    mSubResistorC = EMT::Ph3::Resistor::make(**mName + "_ResC", mLogLevel);
-    addMNASubComponent(mSubResistorC,
-                       MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT,
-                       MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT, false);
-    mSubResistorC->setParameters(Math::singlePhaseParameterToThreePhase(mRc));
+  if (!mModelAsCurrentSource) {
+    mSubCtrledVoltageSource =
+        EMT::Ph3::VoltageSource::make(**mName + "_src", mLogLevel);
+    // Complex(1,0) is used as Vref but it is updated later in the initializationFromPF
+    addMNASubComponent(mSubCtrledVoltageSource, MNA_SUBCOMP_TASK_ORDER::NO_TASK,
+                       MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT, true);
+    mSubCtrledVoltageSource->setParameters(**mSourceValue, 0.0);
   }
 
   // RL Element as part of the LC filter
@@ -96,7 +70,8 @@ void EMT::Ph3::VSIVoltageControlDQ::createSubComponents() {
 
 void EMT::Ph3::VSIVoltageControlDQ::connectSubComponents() {
   // TODO: COULD WE MOVE THIS FUNCTION TO THE BASE CLASS?
-  mSubCtrledVoltageSource->connect({SimNode::GND, mVirtualNodes[0]});
+  if (!mModelAsCurrentSource)
+    mSubCtrledVoltageSource->connect({SimNode::GND, mVirtualNodes[0]});
   if (mWithConnectionTransformer && mWithInterfaceResistor) {
     // with transformer and interface resistor
     mSubFilterRL->connect({mVirtualNodes[1], mVirtualNodes[0]});
@@ -175,7 +150,7 @@ void EMT::Ph3::VSIVoltageControlDQ::initializeFromNodesAndTerminals(
   }
 
   // initial reference voltage of voltage source
-  **mVsref =
+  **mSourceValue =
       Math::singlePhaseVariableToThreePhase(vsInit).real() * RMS3PH_TO_PEAK1PH;
 
   // Create & Initialize electrical subcomponents
@@ -202,7 +177,8 @@ void EMT::Ph3::VSIVoltageControlDQ::initializeFromNodesAndTerminals(
   else
     **mIfilter_dq =
         parkTransformPowerInvariant(**mThetaInv, **mSubFilterRL->mIntfCurrent);
-  **mVsref_dq = parkTransformPowerInvariant(**mThetaInv, (**mVsref).real());
+  **mSourceValue_dq =
+      parkTransformPowerInvariant(**mThetaInv, (**mSourceValue).real());
 
   SPDLOG_LOGGER_INFO(
       mSLog,
@@ -220,8 +196,8 @@ void EMT::Ph3::VSIVoltageControlDQ::initializeFromNodesAndTerminals(
       mTerminals[0]->node()->name(), mTerminals[0]->node()->matrixNodeIndex(),
       Logger::phasorToString((**mIntfVoltage)(0, 0)), (**mVcap_dq).real(),
       (**mVcap_dq).imag(), Logger::phasorToString((**mIntfCurrent)(0, 0)),
-      (**mIfilter_dq).real(), (**mIfilter_dq).imag(), (**mVsref)(0, 0),
-      (**mVsref_dq).real(), (**mVsref_dq).imag());
+      (**mIfilter_dq).real(), (**mIfilter_dq).imag(), (**mSourceValue)(0, 0),
+      (**mSourceValue_dq).real(), (**mSourceValue_dq).imag());
   mSLog->flush();
 }
 
@@ -230,8 +206,8 @@ void EMT::Ph3::VSIVoltageControlDQ::mnaParentInitialize(
   this->updateMatrixNodeIndices();
   mTimeStep = timeStep;
   if (mWithControl)
-    mVSIController->initialize(**mVsref_dq, **mVcap_dq, **mIfilter_dq,
-                               mTimeStep);
+    mVSIController->initialize(**mSourceValue_dq, **mVcap_dq, **mIfilter_dq,
+                               mTimeStep, mModelAsCurrentSource);
 }
 
 void EMT::Ph3::VSIVoltageControlDQ::mnaParentAddPreStepDependencies(
@@ -260,7 +236,7 @@ void EMT::Ph3::VSIVoltageControlDQ::mnaParentPreStep(Real time,
 
   //
   if (mWithControl)
-    **mVsref_dq = mVSIController->step(**mVcap_dq, **mIfilter_dq);
+    **mSourceValue_dq = mVSIController->step(**mVcap_dq, **mIfilter_dq);
 
   // Update nominal system angle
   **mThetaSys = **mThetaSys + mTimeStep * mOmegaNom;
@@ -269,10 +245,11 @@ void EMT::Ph3::VSIVoltageControlDQ::mnaParentPreStep(Real time,
   **mThetaInv = **mThetaInv + mTimeStep * **mOmega;
 
   // Transformation interface backward
-  **mVsref = inverseParkTransformPowerInvariant(**mThetaInv, **mVsref_dq);
+  **mSourceValue =
+      inverseParkTransformPowerInvariant(**mThetaInv, **mSourceValue_dq);
 
   // set reference voltage of voltage source
-  **mSubCtrledVoltageSource->mVoltageRef = **mVsref * PEAK1PH_TO_RMS3PH;
+  **mSubCtrledVoltageSource->mVoltageRef = **mSourceValue * PEAK1PH_TO_RMS3PH;
 
   // pre-step of voltage source
   std::dynamic_pointer_cast<MNAInterface>(mSubCtrledVoltageSource)
