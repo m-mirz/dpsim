@@ -218,10 +218,10 @@ void EMT::Ph3::VSIVoltageControlDQ::updatePower() {
       parkTransformPowerInvariant(**mThetaInv, **mIntfVoltage);
   Complex intfCurrentDQ =
       parkTransformPowerInvariant(**mThetaInv, **mIntfCurrent);
-  **mPower = -Complex(intfVoltageDQ.real() * intfCurrentDQ.real() +
-                          intfVoltageDQ.imag() * intfCurrentDQ.imag(),
-                      intfVoltageDQ.imag() * intfCurrentDQ.real() -
-                          intfVoltageDQ.real() * intfCurrentDQ.imag());
+  **mPower = Complex(intfVoltageDQ.real() * intfCurrentDQ.real() +
+                         intfVoltageDQ.imag() * intfCurrentDQ.imag(),
+                     intfVoltageDQ.imag() * intfCurrentDQ.real() -
+                         intfVoltageDQ.real() * intfCurrentDQ.imag());
 }
 
 Complex
