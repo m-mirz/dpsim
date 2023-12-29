@@ -88,30 +88,13 @@ void EMT::Ph3::VSIVoltageControlDQ::initializeFromNodesAndTerminals(
                                                          intfCurrentComplex)
                        .real();
 
-  // derive initialization quantities of filter
-  /// initial filter capacitor voltage
-  Complex vcInit;
-  if (mWithInterfaceResistor)
-    vcInit = intfVoltageComplex + intfCurrentComplex * mRc;
-  else
-    vcInit = (**mIntfVoltage)(0, 0);
-  /// initial filter capacitor current
-  Complex icfInit = vcInit * Complex(0., mOmegaNom * mCf);
-  /// initial voltage of voltage source
-  Complex vsInit =
-      vcInit + (intfCurrentComplex + icfInit) * Complex(mRf, mOmegaNom * mLf);
+  // initialize filter variables and set initial voltage of virtual nodes
+  initializeFilterVariables(intfVoltageComplex, intfCurrentComplex,
+                            mVirtualNodes);
 
-  // initialize voltage of virtual nodes
-  mVirtualNodes[0]->setInitialVoltage(vsInit);
-  if (mWithInterfaceResistor) {
-    // filter capacitor is connected to mVirtualNodes[1], the second
-    // node of the interface resistor is mTerminals[0]
-    mVirtualNodes[1]->setInitialVoltage(vcInit);
-  }
-
-  // initial reference voltage of voltage source
+  // calculate initial source value
   **mSourceValue =
-      Math::singlePhaseVariableToThreePhase(vsInit).real() * RMS3PH_TO_PEAK1PH;
+      inverseParkTransformPowerInvariant(**mThetaInv, **mSourceValue_dq).real();
 
   // Create & Initialize electrical subcomponents
   this->connectSubComponents();
@@ -122,23 +105,6 @@ void EMT::Ph3::VSIVoltageControlDQ::initializeFromNodesAndTerminals(
 
   // droop
   **mOmega = mOmegaNom;
-
-  // initialize angles
-  **mThetaSys = 0;
-  **mThetaInv = std::arg(vcInit);
-
-  // Initialie voltage controller variables
-  **mVcap_dq =
-      parkTransformPowerInvariant(**mThetaInv, **mSubCapacitorF->mIntfVoltage);
-  if (mWithInterfaceResistor)
-    // TODO: CHECK
-    **mIfilter_dq =
-        parkTransformPowerInvariant(**mThetaInv, **mSubResistorC->mIntfCurrent);
-  else
-    **mIfilter_dq =
-        parkTransformPowerInvariant(**mThetaInv, **mSubFilterRL->mIntfCurrent);
-  **mSourceValue_dq =
-      parkTransformPowerInvariant(**mThetaInv, (**mSourceValue).real());
 
   SPDLOG_LOGGER_INFO(
       mSLog,
@@ -190,29 +156,45 @@ void EMT::Ph3::VSIVoltageControlDQ::mnaParentPreStep(Real time,
   //if (mWithDroop)
   //	mDroop->signalStep(time, timeStepCount);
 
-  //
-  if (mWithControl)
-    **mSourceValue_dq = mVSIController->step(**mVcap_dq, **mIfilter_dq);
-
   // Update nominal system angle
   **mThetaSys = **mThetaSys + mTimeStep * mOmegaNom;
 
   //  VCO Step
   **mThetaInv = **mThetaInv + mTimeStep * **mOmega;
 
+  //
+  if (mWithControl)
+    **mSourceValue_dq = mVSIController->step(**mVcap_dq, **mIfilter_dq);
+
   // Transformation interface backward
   **mSourceValue =
       inverseParkTransformPowerInvariant(**mThetaInv, **mSourceValue_dq);
 
   // set reference voltage of voltage source
-  **mSubCtrledVoltageSource->mVoltageRef = **mSourceValue * PEAK1PH_TO_RMS3PH;
-
-  // pre-step of voltage source
-  std::dynamic_pointer_cast<MNAInterface>(mSubCtrledVoltageSource)
-      ->mnaPreStep(time, timeStepCount);
+  if (!mModelAsCurrentSource) {
+    // pre-step of voltage source
+    **mSubCtrledVoltageSource->mVoltageRef = **mSourceValue * PEAK1PH_TO_RMS3PH;
+    std::dynamic_pointer_cast<MNAInterface>(mSubCtrledVoltageSource)
+        ->mnaPreStep(time, timeStepCount);
+  }
 
   // stamp right side vector
   mnaApplyRightSideVectorStamp(**mRightVector);
+}
+
+void EMT::Ph3::VSIVoltageControlDQ::mnaParentApplyRightSideVectorStamp(
+    Matrix &rightVector) {
+  if (mModelAsCurrentSource) {
+    Math::addToVectorElement(
+        **mRightVector, mVirtualNodes[0]->matrixNodeIndex(CPS::PhaseType::A),
+        (**mSourceValue)(0, 0).real());
+    Math::addToVectorElement(
+        **mRightVector, mVirtualNodes[0]->matrixNodeIndex(CPS::PhaseType::B),
+        (**mSourceValue)(1, 0).real());
+    Math::addToVectorElement(
+        **mRightVector, mVirtualNodes[0]->matrixNodeIndex(CPS::PhaseType::C),
+        (**mSourceValue)(2, 0).real());
+  }
 }
 
 void EMT::Ph3::VSIVoltageControlDQ::mnaParentAddPostStepDependencies(
@@ -229,31 +211,26 @@ void EMT::Ph3::VSIVoltageControlDQ::mnaParentPostStep(
     Real time, Int timeStepCount, Attribute<Matrix>::Ptr &leftVector) {
   mnaCompUpdateCurrent(**leftVector);
   mnaCompUpdateVoltage(**leftVector);
+  updatePower();
 }
 
 void EMT::Ph3::VSIVoltageControlDQ::mnaCompUpdateCurrent(
     const Matrix &leftvector) {
-  if (mWithInterfaceResistor)
-    **mIntfCurrent = mSubResistorC->mIntfCurrent->get();
-  else
-    **mIntfCurrent =
-        mSubCapacitorF->mIntfCurrent->get() + mSubFilterRL->mIntfCurrent->get();
+  **mIntfCurrent =
+      mSubCapacitorF->mIntfCurrent->get() + mSubFilterRL->mIntfCurrent->get();
 }
 
 void EMT::Ph3::VSIVoltageControlDQ::mnaCompUpdateVoltage(
     const Matrix &leftVector) {
-  for (auto virtualNode : mVirtualNodes)
-    // CHECK: Is it really necessary?
-    virtualNode->mnaUpdateVoltage(leftVector);
-
   (**mIntfVoltage)(0, 0) =
       Math::realFromVectorElement(leftVector, matrixNodeIndex(0, 0));
   (**mIntfVoltage)(1, 0) =
       Math::realFromVectorElement(leftVector, matrixNodeIndex(0, 1));
   (**mIntfVoltage)(2, 0) =
       Math::realFromVectorElement(leftVector, matrixNodeIndex(0, 2));
+}
 
-  // Update Power
+void EMT::Ph3::VSIVoltageControlDQ::updatePower() {
   Complex intfVoltageDQ =
       parkTransformPowerInvariant(**mThetaInv, **mIntfVoltage);
   Complex intfCurrentDQ =
