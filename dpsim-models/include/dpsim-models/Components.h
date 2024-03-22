@@ -32,6 +32,7 @@
 #include <dpsim-models/SP/SP_Ph1_Transformer.h>
 #include <dpsim-models/SP/SP_Ph1_VDNode.h>
 #include <dpsim-models/SP/SP_Ph1_VSIVoltageControlDQ.h>
+#include <dpsim-models/SP/SP_Ph1_VSIVoltageControlVBR.h>
 #include <dpsim-models/SP/SP_Ph1_VoltageSource.h>
 #include <dpsim-models/SP/SP_Ph1_VoltageSourceInverter.h>
 #include <dpsim-models/SP/SP_Ph1_varResSwitch.h>
@@ -67,6 +68,7 @@
 #include <dpsim-models/DP/DP_Ph1_SynchronGeneratorTrStab.h>
 #include <dpsim-models/DP/DP_Ph1_Transformer.h>
 #include <dpsim-models/DP/DP_Ph1_VSIVoltageControlDQ.h>
+#include <dpsim-models/DP/DP_Ph1_VSIVoltageControlVBR.h>
 #include <dpsim-models/DP/DP_Ph1_VoltageSource.h>
 #include <dpsim-models/DP/DP_Ph1_VoltageSourceNorton.h>
 #include <dpsim-models/DP/DP_Ph1_VoltageSourceRamp.h>
@@ -109,6 +111,7 @@
 #include <dpsim-models/EMT/EMT_Ph3_SynchronGeneratorDQ.h>
 #include <dpsim-models/EMT/EMT_Ph3_SynchronGeneratorDQTrapez.h>
 #include <dpsim-models/EMT/EMT_Ph3_VSIVoltageControlDQ.h>
+#include <dpsim-models/EMT/EMT_Ph3_VSIVoltageControlVBR.h>
 #include <dpsim-models/EMT/EMT_Ph3_VoltageSource.h>
 #include <dpsim-models/EMT/EMT_Ph3_VoltageSourceNorton.h>
 #ifdef WITH_SUNDIALS
@@ -128,6 +131,7 @@
 #include <dpsim-models/Signal/DecouplingLine.h>
 #include <dpsim-models/Signal/DecouplingLineEMT.h>
 #include <dpsim-models/Signal/Droop.h>
+#include <dpsim-models/Signal/DroopController.h>
 #include <dpsim-models/Signal/ExciterDC1.h>
 #include <dpsim-models/Signal/ExciterDC1Simp.h>
 #include <dpsim-models/Signal/ExciterST1Simp.h>
@@ -145,6 +149,6 @@
 #include <dpsim-models/Signal/TurbineGovernor.h>
 #include <dpsim-models/Signal/TurbineGovernorType1.h>
 #include <dpsim-models/Signal/VCO.h>
-#include <dpsim-models/Signal/VoltageControllerVSI.h>
 #include <dpsim-models/Signal/VSIControlType1.h>
 #include <dpsim-models/Signal/VSIControlType2.h>
+#include <dpsim-models/Signal/VoltageControllerVSI.h>

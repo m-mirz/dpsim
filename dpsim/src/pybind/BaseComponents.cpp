@@ -153,6 +153,20 @@ void addBaseComponents(py::module_ mBase) {
               &CPS::Base::ReducedOrderSynchronGenerator<CPS::Real>::addTurbine),
           "turbine"_a);
 
+  py::class_<CPS::Base::VSIVoltageSourceInverterDQ<CPS::Real>,
+             std::shared_ptr<CPS::Base::VSIVoltageSourceInverterDQ<CPS::Real>>>(
+      mBase, "VSIVoltageSourceInverterDQReal", py::multiple_inheritance())
+      .def("set_parameters",
+           &CPS::Base::VSIVoltageSourceInverterDQ<CPS::Real>::setParameters,
+           "sys_omega"_a, "vdref"_a, "vqref"_a)
+      .def("set_filter_parameters",
+           &CPS::Base::VSIVoltageSourceInverterDQ<
+               CPS::Real>::setFilterParameters,
+           "Lf"_a, "Cf"_a, "Rf"_a, "Rc"_a)
+      .def("add_vsi_controller",
+           &CPS::Base::VSIVoltageSourceInverterDQ<CPS::Real>::addVSIController,
+           "VSIController"_a);
+
   py::class_<
       CPS::Base::VSIVoltageSourceInverterDQ<CPS::Complex>,
       std::shared_ptr<CPS::Base::VSIVoltageSourceInverterDQ<CPS::Complex>>>(

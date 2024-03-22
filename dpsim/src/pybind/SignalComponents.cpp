@@ -284,4 +284,21 @@ void addSignalComponents(py::module_ mSignal) {
       .def_readwrite("Cf", &CPS::Signal::VSIControlType2Parameters::Cf)
       .def_readwrite("Lf", &CPS::Signal::VSIControlType2Parameters::Lf)
       .def_readwrite("tau", &CPS::Signal::VSIControlType2Parameters::tau);
+
+  // Droop Controller
+  py::class_<CPS::Signal::DroopControllerParameters,
+             std::shared_ptr<CPS::Signal::DroopControllerParameters>>(
+      mSignal, "DroopControllerParameters", py::multiple_inheritance())
+      .def(py::init())
+      .def_readwrite("Kpv", &CPS::Signal::DroopControllerParameters::Tau_p)
+      .def_readwrite("Kiv", &CPS::Signal::DroopControllerParameters::Tau_l)
+      .def_readwrite("Kpc", &CPS::Signal::DroopControllerParameters::Mp)
+      .def_readwrite("Kic", &CPS::Signal::DroopControllerParameters::Pref)
+      .def_readwrite("VdRef",
+                     &CPS::Signal::DroopControllerParameters::OmegaNom);
+  py::class_<CPS::Signal::DroopController,
+             std::shared_ptr<CPS::Signal::DroopController>>(
+      mSignal, "DroopController", py::multiple_inheritance())
+      .def(py::init<std::string, CPS::Logger::Level>(), "name"_a,
+           "loglevel"_a = CPS::Logger::Level::off);
 }

@@ -313,8 +313,7 @@ void addSPPh1Components(py::module_ mSPPh1) {
            "loglevel"_a = CPS::Logger::Level::off)
       .def(py::init<std::string, std::string, CPS::Logger::Level, CPS::Bool>(),
            "uid"_a, "name"_a, "loglevel"_a = CPS::Logger::Level::off,
-           // cppcheck-suppress assignBoolToPointer
-           "with_trafo"_a = false)
+           "with_trafo"_a = false) // cppcheck-suppress assignBoolToPointer
       .def("set_parameters",
            &CPS::SP::Ph1::AvVoltageSourceInverterDQ::setParameters,
            "sys_omega"_a, "sys_volt_nom"_a, "p_ref"_a, "q_ref"_a)
@@ -373,10 +372,24 @@ void addSPPh1Components(py::module_ mSPPh1) {
       .def(py::init<std::string, std::string, CPS::Logger::Level, CPS::Bool,
                     CPS::Bool>(),
            "uid"_a, "name"_a, "loglevel"_a = CPS::Logger::Level::off,
-           "model_as_current_source"_a = true,
-           "with_interface_resistor"_a =
-               false) // cppcheck-suppress assignBoolToPointer
+           // cppcheck-suppress assignBoolToPointer
+           "model_as_current_source"_a = false,
+           // cppcheck-suppress assignBoolToPointer
+           "with_interface_resistor"_a = false)
       .def("connect", &CPS::SP::Ph1::VSIVoltageControlDQ::connect);
+
+  py::class_<CPS::SP::Ph1::VSIVoltageControlVBR,
+             std::shared_ptr<CPS::SP::Ph1::VSIVoltageControlVBR>,
+             CPS::SimPowerComp<CPS::Complex>,
+             CPS::Base::VSIVoltageSourceInverterDQ<CPS::Complex>>(
+      mSPPh1, "VSIVoltageControlVBR", py::multiple_inheritance())
+      .def(py::init<std::string, CPS::Logger::Level>(), "name"_a,
+           "loglevel"_a = CPS::Logger::Level::off)
+      .def(py::init<std::string, std::string, CPS::Logger::Level, CPS::Bool>(),
+           "uid"_a, "name"_a, "loglevel"_a = CPS::Logger::Level::off,
+           // cppcheck-suppress assignBoolToPointer
+           "model_as_current_source"_a = false)
+      .def("connect", &CPS::SP::Ph1::VSIVoltageControlVBR::connect);
 }
 
 void addSPPh3Components(py::module_ mSPPh3) {
