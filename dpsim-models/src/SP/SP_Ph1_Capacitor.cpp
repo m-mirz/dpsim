@@ -122,7 +122,7 @@ void SP::Ph1::Capacitor::mnaCompPostStep(Real time, Int timeStepCount,
 
 void SP::Ph1::Capacitor::mnaCompUpdateVoltage(const Matrix &leftVector) {
   // v1 - v0
-  **mIntfVoltage = Matrix::Zero(3, 1);
+  **mIntfVoltage = Matrix::Zero(1, 1);
   if (terminalNotGrounded(1)) {
     (**mIntfVoltage)(0, 0) =
         Math::complexFromVectorElement(leftVector, matrixNodeIndex(1));

@@ -21,6 +21,9 @@ EMT::Ph3::VSIVoltageControlDQ::VSIVoltageControlDQ(String uid, String name,
   mPhaseType = PhaseType::ABC;
   setTerminalNumber(1);
   setVirtualNodeNumber(this->determineNumberOfVirtualNodes());
+  SPDLOG_LOGGER_INFO(mSLog, "\nthis->determineNumberOfVirtualNodes()={}",
+                     this->determineNumberOfVirtualNodes());
+  mSLog->flush();
 }
 
 void EMT::Ph3::VSIVoltageControlDQ::createSubComponents() {
@@ -96,6 +99,13 @@ void EMT::Ph3::VSIVoltageControlDQ::initializeFromNodesAndTerminals(
   **mSourceValue =
       inverseParkTransformPowerInvariant(**mThetaInv, **mSourceValue_dq).real();
 
+  // Create & Initialize electrical subcomponents
+  this->connectSubComponents();
+  for (auto subcomp : mSubComponents) {
+    subcomp->initialize(mFrequencies);
+    subcomp->initializeFromNodesAndTerminals(frequency);
+  }
+
   // droop
   **mOmega = mOmegaNom;
 
@@ -112,7 +122,9 @@ void EMT::Ph3::VSIVoltageControlDQ::initializeFromNodesAndTerminals(
 
 void EMT::Ph3::VSIVoltageControlDQ::mnaParentInitialize(
     Real omega, Real timeStep, Attribute<Matrix>::Ptr leftVector) {
-  this->updateMatrixNodeIndices();
+
+  SPDLOG_LOGGER_INFO(mSLog, "\n--- TEST ---");
+  mSLog->flush();
   mTimeStep = timeStep;
   if (mWithControl)
     mVSIController->initialize(**mSourceValue_dq, **mVcap_dq, **mIfilter_dq,
@@ -123,8 +135,13 @@ void EMT::Ph3::VSIVoltageControlDQ::mnaParentAddPreStepDependencies(
     AttributeBase::List &prevStepDependencies,
     AttributeBase::List &attributeDependencies,
     AttributeBase::List &modifiedAttributes) {
+
   modifiedAttributes.push_back(mRightVector);
   prevStepDependencies.push_back(mIntfVoltage);
+  prevStepDependencies.push_back(mIntfCurrent);
+
+  SPDLOG_LOGGER_INFO(mSLog, "\n--- TEST1 ---");
+  mSLog->flush();
 }
 
 void EMT::Ph3::VSIVoltageControlDQ::mnaParentPreStep(Real time,
